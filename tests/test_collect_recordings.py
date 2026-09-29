@@ -164,6 +164,26 @@ class CollectRecordingsTest(unittest.TestCase):
         self.assertEqual(row["date_source"], "tag")
         self.assertEqual(row["corpus_file"], "raw/2023-05-01_102030_interview-ayşe.wav")
 
+    def test_inventory_saved_by_german_excel_is_read(self):
+        self.run_collector()
+        csv_path = self.dest / "inventory.csv"
+        with open(csv_path, newline="", encoding="utf-8-sig") as fh:
+            rows = list(csv.DictReader(fh))
+        for row in rows:
+            row["notes"] = "Küche, laut" if row["original_path"].endswith("Ayşe.wav") else ""
+        with open(csv_path, "w", newline="", encoding="utf-8-sig") as fh:
+            writer = csv.DictWriter(fh, fieldnames=list(rows[0]), delimiter=";")
+            writer.writeheader()
+            writer.writerows(rows)
+
+        make_wav(self.home / "Desktop" / "New.wav", 2, fill=4)
+        self.run_collector()
+        rows = self.inventory()
+        self.assertEqual(len(rows), 4)
+        self.assertEqual(rows["Interview Ayşe.wav"]["notes"], "Küche, laut")
+        header = csv_path.read_text(encoding="utf-8-sig").splitlines()[0]
+        self.assertTrue(header.startswith("id,corpus_file,"))  # written back with commas
+
     def test_paths_under_home_are_shown_with_tilde(self):
         with mock.patch.object(collect_recordings.Path, "home", return_value=self.home):
             shown = collect_recordings.display_path(self.recording)

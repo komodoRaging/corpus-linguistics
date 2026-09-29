@@ -55,6 +55,8 @@ COLUMNS = [
     "id", "corpus_file", "original_path", "sha256", "size_bytes", "format",
     "duration_s", "sample_rate_hz", "channels", "bitrate_kbps", "recorded_at",
     "date_source", "collected_at", "duplicate_of", "error",
+    # Filled in by transcribe_recordings.py.
+    "language", "transcript", "transcribed_with",
 ]
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -231,14 +233,21 @@ def load_inventory(csv_path: Path) -> list[dict]:
     if not csv_path.exists():
         return []
     with open(csv_path, newline="", encoding="utf-8-sig") as fh:
-        return list(csv.DictReader(fh))
+        # Excel with German (and most European) regional settings saves with ";".
+        header = fh.readline()
+        fh.seek(0)
+        delimiter = ";" if header.count(";") > header.count(",") else ","
+        return list(csv.DictReader(fh, delimiter=delimiter))
 
 
 def write_inventory(csv_path: Path, rows: list[dict]) -> None:
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     tmp = csv_path.with_suffix(".csv.tmp")
+    # Keep columns added by hand (speaker, notes, ...) after the known ones.
+    extra = [key for row in rows for key in row if key and key not in COLUMNS]
+    fieldnames = COLUMNS + list(dict.fromkeys(extra))
     with open(tmp, "w", newline="", encoding="utf-8-sig") as fh:
-        writer = csv.DictWriter(fh, fieldnames=COLUMNS)
+        writer = csv.DictWriter(fh, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
     os.replace(tmp, csv_path)

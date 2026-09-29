@@ -1,8 +1,11 @@
 # corpus-linguistics
 
-## Collecting your sound recordings
+Two steps turn the sound recordings on a Windows computer into a text corpus. Both run entirely on your machine.
 
-`tools/collect_recordings.py` finds the audio recordings on a Windows computer. It copies each unique recording into `recordings/raw/` and lists it in `recordings/inventory.csv`. The originals are only read, never moved, renamed or changed.
+1. `tools/collect_recordings.py` finds the recordings. It copies each unique one into `recordings/raw/` and lists it in `recordings/inventory.csv`. The originals are only read, never moved, renamed or changed.
+2. `tools/transcribe_recordings.py` runs Whisper speech-to-text on every collected recording. It writes a `.txt` and a `.srt` transcript for each one into `recordings/transcripts/`.
+
+## 1. Collecting your sound recordings
 
 ### One-time setup (PowerShell)
 
@@ -56,6 +59,9 @@ It collects `.m4a .wav .mp3 .wma .aac .flac .ogg .opus .aif .aiff .amr .3gp`. It
 | `collected_at` | when this script picked the file up |
 | `duplicate_of` | id of the row holding identical audio found elsewhere (e.g. a OneDrive copy) |
 | `error` | set when the audio properties could not be read; the file is still copied |
+| `language`, `transcript`, `transcribed_with` | filled in by step 2: detected language code, transcript file, model used |
+
+You can add your own columns, such as `speaker`, `place` or `notes`; both scripts keep them. If you save the file from Excel, save it as **CSV UTF-8**. Semicolon-separated files from German Excel are read correctly. Don't edit the existing columns, because the scripts rely on them.
 
 ### Good to know
 
@@ -63,8 +69,48 @@ It collects `.m4a .wav .mp3 .wma .aac .flac .ogg .opus .aif .aiff .amr .3gp`. It
 - **Phone recordings** are not on the computer until you copy them over. Copy them into any folder and pass it with `--root`.
 - **Audacity projects** (`.aup3`) are not audio files. Export them to WAV first if you want them in the corpus.
 
-### Tests
+## 2. Transcribing them
+
+This step uses [faster-whisper](https://github.com/SYSTRAN/faster-whisper), a fast local build of OpenAI's Whisper. The audio is never uploaded. The only download is the model itself, once, from huggingface.co.
 
 ```powershell
-py -m unittest discover tests
+py tools\transcribe_recordings.py --limit 1        # try one recording first
+py tools\transcribe_recordings.py                  # all recordings without a transcript
+```
+
+Each run only picks up recordings that don't have a transcript yet, so after collecting new recordings you just run both steps again. Progress is saved after every file, so you can stop with Ctrl+C at any point.
+
+Each recording `raw\<name>.m4a` gets two files:
+
+- `transcripts\<name>.txt`: plain UTF-8 text, one speech segment per line, ready for AntConc, Voyant, spaCy or NLTK.
+- `transcripts\<name>.srt`: the same text with timestamps. It opens in VLC, Premiere, DaVinci Resolve or any subtitle editor, which is handy for checking a passage against the audio.
+
+Options:
+
+```powershell
+py tools\transcribe_recordings.py --language de                       # skip detection: de, en, tr, nl, ...
+py tools\transcribe_recordings.py --model large-v3-turbo --force      # redo everything with a better model
+py tools\transcribe_recordings.py --device cuda                       # NVIDIA GPU (needs CUDA 12 + cuDNN 9)
+```
+
+Model choice (`--model`, default `small`):
+
+| model | download | notes |
+| --- | --- | --- |
+| `tiny`, `base` | 75–145 MB | fast drafts, weak on accents and non-English speech |
+| `small` | ~480 MB | default; a reasonable balance on a normal CPU |
+| `medium` | ~1.5 GB | clearly better for German, Turkish, Dutch; several times slower |
+| `large-v3-turbo` | ~1.6 GB | near-best accuracy; comfortable on a GPU, slow on CPU |
+| `large-v3` | ~3 GB | most accurate, slowest |
+
+Without `--language`, Whisper detects one language per recording from its first 30 seconds. For recordings that switch between languages, the transcript follows that first language. Split such recordings, or run them again with `--language`.
+
+The transcripts contain the same personal speech as the audio, so `recordings/transcripts/` is git-ignored. To publish the text corpus once everyone recorded has agreed, delete that line from `.gitignore`.
+
+Whisper is good but not perfect. It can mishear names, and occasionally it invents a sentence during long silences or music. Check passages against the `.srt` before quoting them.
+
+## Tests
+
+```powershell
+py -m unittest discover tests      # no model download needed; Whisper is replaced by a stand-in
 ```

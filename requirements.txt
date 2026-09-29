@@ -1,1 +1,2 @@
-mutagen>=1.45
+mutagen>=1.45          # collect_recordings.py: audio metadata
+faster-whisper>=1.1    # transcribe_recordings.py: local Whisper speech-to-text

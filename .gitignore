@@ -1,5 +1,8 @@
 # Collected audio stays on the local machine; only inventory.csv is versioned.
 recordings/raw/
+# Transcripts hold the same personal speech as the audio. Delete this line to
+# commit them, once everyone recorded has agreed.
+recordings/transcripts/
 recordings/*.tmp
 
 __pycache__/
