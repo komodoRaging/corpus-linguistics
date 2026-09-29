@@ -1,0 +1,6 @@
+# Collected audio stays on the local machine; only inventory.csv is versioned.
+recordings/raw/
+recordings/*.tmp
+
+__pycache__/
+.venv/
